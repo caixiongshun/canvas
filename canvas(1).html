@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas</title>
+    <style>
+        canvas {
+            border: 1px solid #000;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="cav"></canvas>
+    <script type="text/javascript">
+        const cavWidth = 800, cavHeight =400;
+        let cavEle, cavCtx;
+        let avatars = [];
+
+        function initCanvas() {
+            cavEle = document.getElementById('cav');
+            cavEle.width = cavWidth;
+            cavEle.height = cavHeight;
+            cavCtx = cavEle.getContext('2d');
+
+            cavEle.onmousedown = onMouseClick;
+        }
+        function initAvatars(avatarSize,speed) {
+            // let avatarSize = 10;
+            for (let i = 0; i < avatarSize; i++) {
+                const avatar = new Avatar();
+                avatar.name = '头像' + (i + 1);
+                // 随机初始位置 不可重叠
+                avatar.left = Math.floor(Math.random() * (cavWidth - avatar.radius * 2));
+                avatar.top = Math.floor(Math.random() * (cavHeight - avatar.radius * 2));
+                //todo 不重叠 这方法有问题
+                let inside=false;
+                for(let j=0;j<avatar.length-1;j++){
+                    if(checkOtherAvatar([avatar.left , avatar.top],avatar[j].left,avatar[j].top,avatar.radius)) {
+                        inside=true;
+                       break;
+                    }
+                }
+                if(inside) {
+                    break;
+                }
+                //end
+
+                // 随机速度（1-60）
+                avatar.speed = Math.floor(Math.random() * 60) + speed;
+
+                // 随机初始角度(0-359)
+                const angle = Math.floor(Math.random() * 360);
+                avatar.angle = angle;
+                avatar._vx = Math.cos(Math.PI / 180 * angle) * avatar.speed;
+                avatar._vy = Math.sin(Math.PI / 180 * angle) * avatar.speed;
+                avatars.push(avatar);
+            }
+        }
+        function globalDraw() {
+            cavCtx.clearRect(0, 0, cavEle.width, cavEle.height);
+            cavCtx.save();
+            avatars.forEach(avatar => {
+                avatar.move();
+                avatar.draw(cavCtx);
+            })
+            cavCtx.restore();
+            window.requestAnimationFrame(globalDraw);
+        }
+
+        function Avatar() {
+            this.name = '';
+            // 圆的正方形左上角的点
+            this.top = 0.0;// 圆的正方形左上角的点
+            this.left = 0.0;
+            // 移动速度，单位：px/s,每秒像素
+            this.speed = 20;
+            // x方向上的分速度
+            this._vx = 0;
+            // y方向上的分速度
+            this._vy = 0;
+            // 半径
+            this.radius = 20;
+            // 角度(正右方向顺时针)
+            this.angle = 120;
+            this.color = 'red';
+            // 上次刷新的时间
+            this._prevTime = 0;
+        }
+        // 计算出下一帧时物体的移动状态（先计算后渲染）
+        Avatar.prototype.move = function () {
+            const nowTime = new Date().getTime();
+            if (this._prevTime == 0) {
+                this._prevTime = nowTime;
+                return;
+            }
+            const spanTime = nowTime - this._prevTime;
+            this._prevTime = nowTime;
+            const moveDistance = this.speed / 1000 * spanTime;
+
+            this.left += this._vx / 1000 * spanTime;
+            this.top += this._vy / 1000 * spanTime;
+
+            // 碰到边界检查，碰撞后进行反弹
+            if (this.left < 0 || (this.left + this.radius * 2) > cavEle.width) {
+                this._vx = -this._vx;
+                this.left = this.left < 0 ? 0 : cavEle.width - this.radius * 2;
+            }
+            if (this.top < 0 || (this.top + this.radius * 2) > cavEle.height) {
+                this._vy = -this._vy;
+                this.top = this.top < 0 ? 0 : cavEle.height - this.radius * 2;
+            }
+            //判断是否碰撞其他球体
+
+        };
+        // 判断点（l, t）是否在物体自身范围内
+        Avatar.prototype.isInside = function(l, t) {
+            // 算出圆心位置
+            const oLeft = this.left + this.radius;
+            const oTop = this.top + this.radius;
+            // 计算点击点距离圆心的距离
+            const d = Math.sqrt(Math.pow(Math.abs(l - oLeft), 2) + Math.pow(Math.abs(t - oTop), 2));
+            return d <= this.radius;
+        }
+        // 在画布上渲染出物体
+        Avatar.prototype.draw = function (context) {
+            context.save();
+
+            // 平移
+            context.translate(this.left, this.top);
+            // 画笔
+            context.fillStyle = this.color;
+            // 画圆
+            context.beginPath();
+            context.arc(this.radius, this.radius, this.radius, 0, Math.PI * 2, false);
+            context.closePath();
+            context.fill();
+            // console.log(this.radius);
+            // 写文字
+            context.font = '12px serif';
+            context.textAlign = 'left';
+            context.textBaseline = "middle";
+            context.fillStyle = '#000';
+            context.fillText(this.name, 0, this.radius);
+
+            for(let i=0;i<avatars.length;i++) {
+                let oneAva = avatars[i];
+                // console.log(oneAva.left);
+                if(oneAva.left==this.left) {
+
+                }else {
+                    if (checkOtherAvatar([oneAva.left, oneAva.top], [this.left, this.top], this.radius)) {//这个圆的周边
+                        let random_x = Math.random() + 10;
+                        let random_y = Math.random() + 10;
+                        this._vx = -this._vx+random_x;
+                        this._vy = -this._vy+random_y;
+                        // context.translate(this.left, this.top);
+                        console.log('碰撞了'+oneAva.name);
+
+                    }
+                }
+
+            }
+            context.restore();
+        };
+
+        /**
+         * 判断某个点是否在圆内
+         * @param point
+         * @param circle
+         * @param r
+         * @returns {boolean}
+         */
+        function checkOtherAvatar(point, circle, r){
+
+            if (r===0) return false;
+            // var dx = circle[0] - point[0]
+            // var dy = circle[1] - point[1]
+            var dx=Math.abs(circle[0]-point[0]);
+            var dy=Math.abs(circle[1]-point[1]);
+            let dis=Math.sqrt(Math.pow(dx,2)+Math.pow(dy,2));
+            if(dis>(r*2)){
+                return false;
+            }
+            // console.log("这两点之间的直线距离为:"+parseInt(dis)+"px");
+            return true;
+            return dx * dx + dy * dy <= r * r
+
+        }
+
+        console.log(checkOtherAvatar([10, 10], [10, 20], 10));
+
+        function onMouseClick(ev) {
+            // 相对于画布左上角（x,y）
+            const { clientX, clientY } = ev
+            avatars.forEach(avatar => {
+                if (avatar.isInside(clientX, clientY)) {
+                    avatar.color = avatar.color === 'red' ? 'green' : 'red';
+                    console.log(avatar.name + '被点击');
+                    return;
+                }
+            })
+        }
+
+        initCanvas();
+        initAvatars(10,100);
+        globalDraw();
+    </script>
+</body>
+</html>
